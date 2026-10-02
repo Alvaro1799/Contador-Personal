@@ -75,6 +75,21 @@
   .atajos { display:none; margin-top:10px; font-size:.75rem; color:#5d6577; }
   @media (hover:hover) and (pointer:fine) { .atajos { display:block; } }
 
+  /* Botón enlace + ventana emergente "Usar en el teléfono" */
+  .linkBtn { margin-top:14px; background:none; border:none; color:#5b93ff; font-size:.85rem; cursor:pointer; text-decoration:underline; }
+  .modalFondo { position:fixed; inset:0; background:rgba(0,0,0,.65); display:flex; align-items:center; justify-content:center; padding:16px; z-index:10; }
+  .modalFondo[hidden] { display:none; }
+  .modalCaja { background:#171b24; border:1px solid #2a3040; border-radius:16px; padding:20px; width:100%; max-width:440px; max-height:90vh; overflow-y:auto; user-select:text; -webkit-user-select:text; }
+  .modalCaja h2 { font-size:1.15rem; margin-bottom:12px; }
+  .modalCaja ol { padding-left:20px; display:flex; flex-direction:column; gap:10px; font-size:.92rem; line-height:1.4; color:#c8cedd; }
+  .modalCaja .aviso { margin-top:14px; padding:10px 12px; border-radius:10px; background:#1e2330; color:#f0c674; font-size:.82rem; line-height:1.4; }
+  .modalCaja .linkBox { display:flex; gap:8px; margin-top:14px; }
+  .modalCaja input { flex:1; min-width:0; padding:10px; border-radius:8px; border:1px solid #2a3040; background:#0f1115; color:#e8eaf0; font-size:.8rem; }
+  .modalCaja button { padding:10px 14px; border-radius:10px; border:1px solid #2a3040; background:#236ad3; color:#fff; font-size:.88rem; cursor:pointer; }
+  .modalCaja .sec { background:#171b24; color:#e8eaf0; }
+  .modalCaja .acciones { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .modalCaja .acciones button { flex:1; }
+
   /* Animación del número al tocar */
   @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.12)} 100%{transform:scale(1)} }
   .pop { animation: pop .18s ease; }
@@ -122,6 +137,7 @@
     <label class="wakelock">
       <input type="checkbox" id="chkWake"> Mantener pantalla encendida
     </label>
+    <button class="linkBtn" id="btnTelefono">📱 Usar en el teléfono</button>
     <div class="atajos">Atajos: <b>+</b> o <b>↑</b> suma · <b>−</b> o <b>↓</b> deshace</div>
   </section>
 
@@ -141,6 +157,28 @@
     </div>
   </section>
 </main>
+
+<!-- Ventana emergente: pasar los datos al teléfono -->
+<div class="modalFondo" id="modal" hidden>
+  <div class="modalCaja" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <h2 id="modalTitulo">📱 Usar en el teléfono</h2>
+    <ol>
+      <li>En la computadora ve a <b>Historial → Respaldar JSON</b> (o usa el botón de abajo). Se descarga un archivo con tus datos.</li>
+      <li>Envíate ese archivo al teléfono (correo, Drive, WhatsApp…) y guárdalo ahí.</li>
+      <li>Abre este link en el teléfono y agrégalo a la pantalla de inicio desde el menú del navegador (<b>Agregar a pantalla de inicio</b>).</li>
+      <li>En el teléfono ve a <b>Historial → Restaurar JSON</b> y elige el archivo.</li>
+    </ol>
+    <div class="linkBox">
+      <input id="urlApp" readonly>
+      <button id="btnCopiar">Copiar link</button>
+    </div>
+    <div class="aviso">⚠️ Restaurar reemplaza los datos del dispositivo. El teléfono y la computadora no se sincronizan solos: repite el respaldo cuando quieras pasar el conteo de uno a otro.</div>
+    <div class="acciones">
+      <button class="sec" id="btnRespaldoModal">Descargar respaldo ahora</button>
+      <button id="btnCerrarModal">Entendido</button>
+    </div>
+  </div>
+</div>
 
 <!-- Navegación inferior -->
 <nav>
@@ -312,6 +350,8 @@ function restaurar(ev) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || typeof obj[k] !== 'number' || obj[k] < 0)
           throw new Error('datos inválidos');
       }
+      if (Object.keys(datos).length > 0 &&
+          !confirm('Esto reemplazará los datos actuales de este dispositivo con los del archivo. ¿Continuar?')) return;
       datos = obj;
       guardar(); pintar(); pintarHistorial();
       alert('Datos restaurados correctamente.');
@@ -378,6 +418,26 @@ document.getElementById('mesNext').addEventListener('click', () => cambiarMes(1)
 document.getElementById('btnCSV').addEventListener('click', exportarCSV);
 document.getElementById('btnBackup').addEventListener('click', respaldar);
 document.getElementById('fileRestore').addEventListener('change', restaurar);
+/* Ventana "Usar en el teléfono" */
+const modal = document.getElementById('modal');
+function abrirModal() {
+  const esWeb = location.protocol.startsWith('http');
+  document.getElementById('urlApp').value = esWeb ? location.href.split('#')[0] : 'Publica la página primero para obtener el link';
+  modal.hidden = false;
+}
+function cerrarModal() { modal.hidden = true; }
+document.getElementById('btnTelefono').addEventListener('click', abrirModal);
+document.getElementById('btnCerrarModal').addEventListener('click', cerrarModal);
+document.getElementById('btnRespaldoModal').addEventListener('click', respaldar);
+document.getElementById('btnCopiar').addEventListener('click', async e => {
+  const inp = document.getElementById('urlApp');
+  try { await navigator.clipboard.writeText(inp.value); e.target.textContent = '¡Copiado!'; }
+  catch { inp.select(); e.target.textContent = 'Selecciona y copia'; }
+  setTimeout(() => e.target.textContent = 'Copiar link', 1800);
+});
+modal.addEventListener('click', e => { if (e.target === modal) cerrarModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
 document.getElementById('chkWake').addEventListener('change', e => pedirWakeLock(e.target.checked));
 
 // Wake Lock: activado por defecto solo en pantallas táctiles (teléfono/tablet)
@@ -388,6 +448,7 @@ if (esTactil) pedirWakeLock(true);
 // Atajos de teclado (escritorio): solo en la vista Contador
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!document.getElementById('modal').hidden) return;
   if (document.getElementById('vistaContador').style.display === 'none') return;
   if (['+','=','ArrowUp'].includes(e.key)) { e.preventDefault(); sumar(1); }
   else if (['-','_','ArrowDown'].includes(e.key)) { e.preventDefault(); sumar(-1); }
