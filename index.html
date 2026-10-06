@@ -164,6 +164,7 @@
     <label class="wakelock">
       <input type="checkbox" id="chkWake"> Mantener pantalla encendida
     </label>
+    <button class="linkBtn" id="btnFlotante" hidden>🪟 Ventana flotante</button>
     <button class="linkBtn" id="btnTelefono">📱 Usar en el teléfono</button>
     <div class="atajos">Atajos: <b>+</b>/<b>↑</b> suma 1 · <b>5</b> suma 5 · <b>0</b> suma 10 · <b>−</b>/<b>↓</b> deshace</div>
   </section>
@@ -255,6 +256,7 @@ function sumarDias(clave, n) {
 /* ---------- Persistencia (localStorage con try/catch) ---------- */
 
 let datos = {};   // { "2026-10-01": 5, ... }
+let pipWin = null;   // ventana flotante (Document Picture-in-Picture), si está abierta
 let pila = [];    // últimas sumas de esta sesión, para poder deshacerlas: {clave, n}
 // Meta diaria (opcional, 0 = sin meta). Se guarda aparte de los conteos.
 let meta = (() => { try { return parseInt(localStorage.getItem(LS_KEY + '_meta')) || 0; } catch (e) { return 0; } })();
@@ -296,8 +298,9 @@ function totalMes(prefijo) {  // prefijo = "YYYY-MM"
 }
 
 function feedback() {
-  const el = document.getElementById('hoyNum');
-  el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  const els = [document.getElementById('hoyNum')];
+  if (pipWin) els.push(pipWin.document.getElementById('hoyNum'));
+  els.forEach(el => { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); });
   if (navigator.vibrate) navigator.vibrate(30);
 }
 
@@ -336,6 +339,15 @@ function pintar() {
   const rell = document.getElementById('barraRell');
   rell.style.width = meta ? Math.min(100, totalHoy() / meta * 100) + '%' : '0';
   rell.classList.toggle('ok', meta > 0 && totalHoy() >= meta);
+  if (pipWin) pintarPip();
+}
+
+function pintarPip() {
+  const $p = id => pipWin.document.getElementById(id);
+  $p('hoyNum').textContent = totalHoy();
+  $p('semNum').textContent = totalSemana();
+  $p('mesNum').textContent = totalMes(claveFecha().slice(0,7));
+  $p('btnMenos').textContent = pila.length ? '↶ −' + pila[pila.length-1].n : '− 1';
 }
 
 /* ---------- Historial (mes navegable) ---------- */
@@ -526,16 +538,64 @@ document.getElementById('chkWake').checked = esTactil;
 if (esTactil) pedirWakeLock(true);
 
 // Atajos de teclado (escritorio): solo en la vista Contador
-document.addEventListener('keydown', e => {
+function atajos(e) {
+  const enPip = e.target.ownerDocument !== document;   // evento de la ventana flotante
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (!document.getElementById('modal').hidden) return;
-  if (document.getElementById('vistaContador').style.display === 'none') return;
+  if (!enPip && document.getElementById('vistaContador').style.display === 'none') return;
   if (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') return;   // escribiendo en un campo
   if (['+','=','ArrowUp'].includes(e.key)) { e.preventDefault(); sumar(1); }
   else if (e.key === '5') { e.preventDefault(); sumar(5); }
   else if (e.key === '0') { e.preventDefault(); sumar(10); }
   else if (['-','_','ArrowDown'].includes(e.key)) { e.preventDefault(); deshacer(); }
-});
+}
+document.addEventListener('keydown', atajos);
+
+/* ---------- Ventana flotante (siempre encima de otras ventanas, p. ej. Google Chat) ----------
+   Usa la API Document Picture-in-Picture (Chrome/Edge de escritorio, requiere https).
+   La ventana tiene su propia mini interfaz; ambas comparten los mismos datos. */
+async function alternarFlotante() {
+  if (pipWin) { pipWin.close(); return; }
+  try {
+    const pw = await window.documentPictureInPicture.requestWindow({ width: 300, height: 400 });
+    pipWin = pw;
+    // Reutiliza los mismos estilos de la página
+    document.querySelectorAll('style').forEach(st => pw.document.head.appendChild(st.cloneNode(true)));
+    pw.document.body.innerHTML = `
+      <main><section id="vistaContador">
+        <div class="etiqueta">Mensajes hoy</div>
+        <div id="hoyNum">0</div>
+        <div class="subtotales">
+          <div><div class="num" id="semNum">0</div><div class="lbl">SEMANA</div></div>
+          <div><div class="num" id="mesNum">0</div><div class="lbl">MES</div></div>
+        </div>
+        <button id="btnMas">+</button>
+        <div class="fila">
+          <button id="btnMenos">− 1</button>
+          <button class="mas" data-n="5">+5</button>
+          <button class="mas" data-n="10">+10</button>
+        </div>
+      </section></main>`;
+    const $p = id => pw.document.getElementById(id);
+    $p('btnMas').addEventListener('click', () => sumar(1));
+    $p('btnMenos').addEventListener('click', deshacer);
+    pw.document.querySelectorAll('.mas[data-n]').forEach(b =>
+      b.addEventListener('click', () => sumar(Number(b.dataset.n))));
+    pw.document.addEventListener('keydown', atajos);
+    pw.addEventListener('pagehide', () => { pipWin = null; document.getElementById('btnFlotante').textContent = '🪟 Ventana flotante'; });
+    document.getElementById('btnFlotante').textContent = '🪟 Cerrar ventana flotante';
+    pintar();
+  } catch (e) {
+    console.warn('No se pudo abrir la ventana flotante:', e);
+    pipWin = null;
+    alert('No se pudo abrir la ventana flotante. Usa Chrome o Edge de escritorio y abre la página desde el link https.');
+  }
+}
+if ('documentPictureInPicture' in window) {
+  const bf = document.getElementById('btnFlotante');
+  bf.hidden = false;
+  bf.addEventListener('click', alternarFlotante);
+}
 </script>
 </body>
 </html>
