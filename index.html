@@ -343,11 +343,10 @@ function pintar() {
 }
 
 function pintarPip() {
-  const $p = id => pipWin.document.getElementById(id);
-  $p('hoyNum').textContent = totalHoy();
-  $p('semNum').textContent = totalSemana();
-  $p('mesNum').textContent = totalMes(claveFecha().slice(0,7));
-  $p('btnMenos').textContent = pila.length ? '↶ −' + pila[pila.length-1].n : '− 1';
+  const el = pipWin.document.getElementById('hoyNum');
+  const n = totalHoy();
+  el.textContent = n;
+  el.style.setProperty('--d', Math.max(2, String(n).length));   // ajusta el tamaño al número de dígitos
 }
 
 /* ---------- Historial (mes navegable) ---------- */
@@ -557,31 +556,17 @@ document.addEventListener('keydown', atajos);
 async function alternarFlotante() {
   if (pipWin) { pipWin.close(); return; }
   try {
-    const pw = await window.documentPictureInPicture.requestWindow({ width: 300, height: 400 });
+    const pw = await window.documentPictureInPicture.requestWindow({ width: 150, height: 100 });
     pipWin = pw;
-    // Reutiliza los mismos estilos de la página
+    // Reutiliza los mismos estilos de la página y los ajusta para mostrar solo el número
     document.querySelectorAll('style').forEach(st => pw.document.head.appendChild(st.cloneNode(true)));
-    pw.document.body.innerHTML = `
-      <main><section id="vistaContador">
-        <div class="etiqueta">Mensajes hoy</div>
-        <div id="hoyNum">0</div>
-        <div class="subtotales">
-          <div><div class="num" id="semNum">0</div><div class="lbl">SEMANA</div></div>
-          <div><div class="num" id="mesNum">0</div><div class="lbl">MES</div></div>
-        </div>
-        <button id="btnMas">+</button>
-        <div class="fila">
-          <button id="btnMenos">− 1</button>
-          <button class="mas" data-n="5">+5</button>
-          <button class="mas" data-n="10">+10</button>
-        </div>
-      </section></main>`;
-    const $p = id => pw.document.getElementById(id);
-    $p('btnMas').addEventListener('click', () => sumar(1));
-    $p('btnMenos').addEventListener('click', deshacer);
-    pw.document.querySelectorAll('.mas[data-n]').forEach(b =>
-      b.addEventListener('click', () => sumar(Number(b.dataset.n))));
-    pw.document.addEventListener('keydown', atajos);
+    const ajuste = pw.document.createElement('style');
+    ajuste.textContent = `
+      #vistaContador { padding:0; gap:0; justify-content:center; }
+      #hoyNum { margin:0; line-height:1; font-size:min(70vh, calc(100vw / (var(--d, 2) * 0.65))); }`;
+    pw.document.head.appendChild(ajuste);
+    pw.document.body.innerHTML = '<main><section id="vistaContador"><div id="hoyNum">0</div></section></main>';
+    pw.document.addEventListener('keydown', atajos);   // los atajos funcionan con la ventana enfocada (haz clic en ella)
     pw.addEventListener('pagehide', () => { pipWin = null; document.getElementById('btnFlotante').textContent = '🪟 Ventana flotante'; });
     document.getElementById('btnFlotante').textContent = '🪟 Cerrar ventana flotante';
     pintar();
