@@ -166,7 +166,7 @@
     </label>
     <button class="linkBtn" id="btnFlotante" hidden>🪟 Ventana flotante</button>
     <button class="linkBtn" id="btnTelefono">📱 Usar en el teléfono</button>
-    <div class="atajos">Atajos: <b>+</b>/<b>↑</b> suma 1 · <b>5</b> suma 5 · <b>0</b> suma 10 · <b>−</b>/<b>↓</b> deshace</div>
+    <div class="atajos">Atajos: <b>1</b>–<b>9</b> suman ese número · <b>0</b> suma 10 · <b>+</b>/<b>↑</b> suma 1 · <b>−</b>/<b>↓</b> deshace</div>
   </section>
 
   <!-- ========== VISTA HISTORIAL ========== -->
@@ -545,7 +545,7 @@ function atajos(e) {
   if (!enPip && document.getElementById('vistaContador').style.display === 'none') return;
   if (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') return;   // escribiendo en un campo
   if (['+','=','ArrowUp'].includes(e.key)) { e.preventDefault(); sumar(1); }
-  else if (e.key === '5') { e.preventDefault(); sumar(5); }
+  else if (/^[1-9]$/.test(e.key)) { e.preventDefault(); sumar(Number(e.key)); }   // 1-9 suman ese número
   else if (e.key === '0') { e.preventDefault(); sumar(10); }
   else if (['-','_','ArrowDown'].includes(e.key)) { e.preventDefault(); deshacer(); }
 }
